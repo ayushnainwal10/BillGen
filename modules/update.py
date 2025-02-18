@@ -4,17 +4,58 @@ import sqlite3
 import tkinter.messagebox
 import os
 
+# Dynamically construct the database path based on the project structure
+# Get the absolute path of this script's directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Go one level up to the project root
+project_root = os.path.abspath(os.path.join(current_dir, ".."))
+# Database file path
+database_path = os.path.join(project_root, "database", "store.db")
 
-database_path = os.path.join(".", "database", "store.db")
-conn = sqlite3.connect(database_path)
-c = conn.cursor()
+# Ensure the database directory exists
+if not os.path.exists(os.path.dirname(database_path)):
+    os.makedirs(os.path.dirname(database_path))  # Create the directory if it doesn't exist
 
-result = c.execute("SELECT Max(id) from inventory")
-for r in result:
-    id = r[0]
+# Initialize SQLite connection
+try:
+    conn = sqlite3.connect(database_path)
+    c = conn.cursor()
+    print("Database connection successful")
+except sqlite3.OperationalError as e:
+    print(f"Error: Unable to connect to the database. {e}")
+    exit(1)
+
+# Ensure the 'inventory' table exists. If not, initialize it.
+try:
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS inventory (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        stock INTEGER NOT NULL,
+        cp REAL NOT NULL,
+        sp REAL NOT NULL,
+        totalcp REAL NOT NULL,
+        totalsp REAL NOT NULL,
+        vendor TEXT NOT NULL,
+        vendor_phoneno TEXT NOT NULL
+    )
+    """)
+    conn.commit()
+except sqlite3.Error as e:
+    print(f"Error initializing database schema: {e}")
+    exit(1)
+
+# Fetch the maximum ID from the inventory table
+try:
+    result = c.execute("SELECT MAX(id) FROM inventory")
+    id = result.fetchone()[0] or 0  # Set to 0 if no records exist
+except sqlite3.Error as e:
+    print(f"Error fetching maximum ID from database: {e}")
+    id = 0
+
+
 class Database:
     def __init__(self, master, *args, **kwargs):
-        
         self.master = master
         self.heading = Label(master, text="Update the database", font=('arial 40 bold'), fg='steelblue')
         self.heading.place(x=400, y=0)
@@ -23,7 +64,7 @@ class Database:
         self.id_le = Label(master, text="Enter Id", font=('arial 18 bold'))
         self.id_le.place(x=0, y=70)
 
-        self.id_leb = Entry(master, font=('arial 18 bold') ,width=10)
+        self.id_leb = Entry(master, font=('arial 18 bold'), width=10)
         self.id_leb.place(x=380, y=70)
 
         self.btn_search = Button(master, text="Search", width=15, height=2, bg='orange', command=self.search)
@@ -49,7 +90,7 @@ class Database:
 
         self.vendor_l = Label(master, text="Enter Vendor Name", font=('arial 18 bold'))
         self.vendor_l.place(x=0, y=420)
-    
+
         self.vendor_phone_l = Label(master, text="Enter Vendor Phone Number", font=('arial 18 bold'))
         self.vendor_phone_l.place(x=0, y=470)
 
@@ -79,27 +120,28 @@ class Database:
         self.vendor_phone_e.place(x=380, y=470)
 
         # button to add to the database
-        self.btn_add = Button(master, text="Update Database", width=25, height=2, bg='steelblue', fg='white', command=self.update)
+        self.btn_add = Button(master, text="Update Database", width=25, height=2, bg='steelblue', fg='white',
+                              command=self.update)
         self.btn_add.place(x=520, y=520)
 
         # text box for the logs
         self.tBox = Text(master, width=60, height=18)
         self.tBox.place(x=750, y=70)
         self.tBox.insert(END, "ID has reached upto: " + str(id))
-    
+
     def search(self, *args, **kwargs):
         sql = "SELECT * FROM inventory WHERE id=?"
-        result = c.execute(sql, (self.id_leb.get(), ))
+        result = c.execute(sql, (self.id_leb.get(),))
         for r in result:
-            self.n1 = r[1] #name
-            self.n2 = r[2] #stock
-            self.n3 = r[3] #cp
-            self.n4 = r[4] #sp
-            self.n5 = r[5] #totalcp
-            self.n6 = r[6] #totalsp
-            self.n7 = r[7] #assumed_profit
-            self.n8 = r[8] #vendor
-            self.n9 = r[9] #vendor_phone
+            self.n1 = r[1]  # name
+            self.n2 = r[2]  # stock
+            self.n3 = r[3]  # cp
+            self.n4 = r[4]  # sp
+            self.n5 = r[5]  # totalcp
+            self.n6 = r[6]  # totalsp
+            self.n7 = r[7]  # assumed_profit
+            self.n8 = r[8]  # vendor
+            self.n9 = r[9]  # vendor_phone
         conn.commit()
 
         # insert into the entries to update
@@ -128,20 +170,14 @@ class Database:
         self.totalsp_e.insert(0, str(self.n6))
 
     def update(self, *args, **kwargs):
-        # get all the updated values
-        self.u1 = self.name_e.get()
-        self.u2 = self.stock_e.get()
-        self.u3 = self.cp_e.get()
-        self.u4 = self.sp_e.get()
-        self.u5 = self.totalcp_e.get()
-        self.u6 = self.totalsp_e.get()
-        self.u7 = self.vendor_e.get()
-        self.u8 = self.vendor_phone_e.get()
+        self.u1, self.u2, self.u3, self.u4 = self.name_e.get(), self.stock_e.get(), self.cp_e.get(), self.sp_e.get()
+        self.u5, self.u6, self.u7, self.u8 = self.totalcp_e.get(), self.totalsp_e.get(), self.vendor_e.get(), self.vendor_phone_e.get()
 
         query = "UPDATE inventory SET name=?, stock=?, cp=?, sp=?, totalcp=?, totalsp=?, vendor=?, vendor_phoneno=? WHERE id=?"
         c.execute(query, (self.u1, self.u2, self.u3, self.u4, self.u5, self.u6, self.u7, self.u8, self.id_leb.get()))
         conn.commit()
         tkinter.messagebox.showinfo("Success", "Update database Successful")
+
 
 root = Tk()
 b = Database(root)
